@@ -2,6 +2,7 @@ import requests
 import clearbit
 import time
 import yaml
+import fetch_data
 
 
 def format_request(company):
@@ -50,6 +51,25 @@ def get_company(target_domain):
     if company != None and 'pending' not in company:
       return company
 
+def fetch_and_process(query):
+    fetch_config = config['fetch']
+    batch_size = fetch_config['batch_size']
+
+    request_list = []
+    def handle_row(row):
+        domain = row[0]
+        company = get_company(domain)
+        if company:
+            data = format_request(company)
+        else:
+            data = format_null_request(domain)
+        request_list.append(data)
+
+        if len(request_list) >= batch_size:
+            send_to_rj(request_list)
+            del request_list[:]
+
+    fetch_data.fetch(fetch_config, query, handle_row)
 
 def process_list(domains):
     data = []
@@ -69,4 +89,4 @@ def get_config():
 
 config = get_config()
 clearbit.key = config['clearbit_access_token']
-process_list(['stripe.com', 'rjmetrics.com'])
+fetch_and_process("select domain from accounts limit 10")
