@@ -4,7 +4,8 @@ import time
 import yaml
 
 
-def format_data(company):
+def format_request(company):
+    company['response_timestamp'] = time.time()
     return  {
         "client_id": config['rjm_cid'],
         "table_name": "companies",
@@ -15,6 +16,23 @@ def format_data(company):
             ],
         "data": company
         }
+
+
+def format_null_request(domain):
+    return  {
+        "client_id": config['rjm_cid'],
+        "table_name": "null_responses",
+        "sequence": int(round(time.time() * 1000)),
+        "action": "upsert",
+        "key_names": [
+            "domain"
+            ],
+        "data": {
+            "domain": domain,
+            "response_timestamp": time.time()
+            }
+        }
+
 
 def send_to_rj(data):
     suffix = 'push' if config['mode'] == 'production' else 'validate'
@@ -37,7 +55,8 @@ def process_list(domains):
     data = []
     for domain in domains:
         company = get_company(domain)
-        if company: data.append(format_data(company))
+        data.append(format_request(company)) if company else data.append(format_null_request(domain))
+    print(data)
     send_to_rj(data)
 
 def get_config():

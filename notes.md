@@ -2,8 +2,6 @@
 
 - connect to redshift, get domains that have not had lookups in the recent past and look them up
   - make sure to only lookup domains that have ltv > 0
-- append lookup timestamp to data in redshift so that i can filter on that.
-
 
 
 
