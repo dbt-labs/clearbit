@@ -1,0 +1,5 @@
+rjm_access_key: #get this from the rjmetrics pipeline interface
+clearbit_access_token: #get this from clearbit
+rjm_base_url: https://pipeline-gateway.rjmetrics.com
+rjm_cid: #get this from rjmetrics pipeline
+mode: test #production
