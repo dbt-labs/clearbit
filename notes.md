@@ -17,7 +17,7 @@ with users as (
 
 )
 
-select email, regexp_substr(email, '[^@]*$') as email_domain
+select distinct regexp_substr(email, '[^@]*$') as email_domain
 from users
-limit 100
+where state = 'active'
 ```
