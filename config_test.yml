@@ -5,4 +5,8 @@ rjm_cid: #get this from rjmetrics pipeline
 mode: test #production
 fetch:
   batch_size: 2
-  per_second: 5
+  dbname: dbname
+  user:  user
+  password: pass
+  host: localhost
+  port: 5439
