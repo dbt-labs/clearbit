@@ -3,3 +3,10 @@ clearbit_access_token: #get this from clearbit
 rjm_base_url: https://pipeline-gateway.rjmetrics.com
 rjm_cid: #get this from rjmetrics pipeline
 mode: test #production
+fetch:
+  batch_size: 100 # number of records to process at a time
+  dbname: dbname
+  user:  user
+  password: pass
+  host: localhost
+  port: 5439
