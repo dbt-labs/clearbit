@@ -3,7 +3,8 @@ import clearbit
 import time
 import yaml
 import sys
-import fetch_data
+import os, sys
+import datafetcher
 
 def format_request(company):
     company['response_timestamp'] = time.time()
@@ -38,75 +39,62 @@ def format_null_request(domain):
 def send_to_rj(data):
     suffix = 'push' if config['mode'] == 'production' else 'validate'
     url = "%s/%s" % (config['rjm_base_url'], suffix)
-    print(url)
+    print("SENDING TO: {}".format(url))
     headers = {
         'Content-Type': 'application/json',
         'Authorization': "Bearer %s" % (config['rjm_access_key'])
         }
     r = requests.post(url, json = data, headers = headers)
-
+    if (suffix == 'push' and r.status_code == 201) or (suffix == 'validate' and r.status_code == 200, 201):
+      print("  -> Success")
+    else:
+      print("  -> ERROR! {}".format(r.content))
 
 def get_company(target_domain):
-    company = clearbit.Company.find(domain=target_domain)
+    company = clearbit.Company.find(domain=target_domain, stream=True)
     if company != None and 'pending' not in company:
       return company
+
+def get_response_for_found_domain(domain, company):
+    response = format_request(company)
+    company_domain = company['domain'].encode('ascii', 'ignore')
+    company_name   = company['name'].encode('ascii', 'ignore')
+    print("{} Found:\t{}\t{}".format(counts['total'], company_domain, company_name))
+    counts['ok'] += 1
+    return response
+
+def get_response_for_missing_domain(domain, error_reason):
+    response = format_null_request(domain)
+    print("{} Not found:\t{}\t{}".format(counts['total'], domain, error_reason))
+    counts['error'] += 1
+    return response
+
+def get_response_for_domain(domain):
+    counts['total'] += 1
+    try:
+        company = get_company(domain)
+    except requests.exceptions.RequestException as e:
+        error_type = e.response.json().get('error', {}).get('type', 'unknown')
+        return get_response_for_missing_domain(domain, error_type)
+
+    if company:
+        response = get_response_for_found_domain(domain, company)
+    else:
+        response = get_response_for_missing_domain(domain, "missing")
+
+    return response
 
 def fetch_and_process(query):
     fetch_config = config['fetch']
     batch_size = fetch_config['batch_size']
 
-    request_list = []
-    counts = {
-        'total': 0,
-        'ok': 0,
-        'error': 0,
-    }
-    def handle_row(row):
-        counts['total'] += 1
+    for batch_of_records in datafetcher.fetch(fetch_config, query, batch_size):
+        responses = [get_response_for_domain(record['domain']) for record in batch_of_records]
+        send_to_rj(responses)
 
-        domain = row[0]
+        print("TOTAL: {}\tOK: {}\tERROR: {}".format(counts['total'], counts['ok'], counts['error']))
 
-        try:
-          company = get_company(domain)
-        except requests.exceptions.RequestException as e:
-          counts['error'] += 1
-          print "ERROR: {}".format(e.message)
-          return
-
-        counts['ok'] += 1
-        if company:
-            data = format_request(company)
-        else:
-            data = format_null_request(domain)
-        request_list.append(data)
-
-        if len(request_list) >= batch_size:
-            send_to_rj(request_list)
-            del request_list[:]
-
-        if counts['total'] % 2 == 0:
-          print "TOTAL: {}\tOK: {}\tERROR: {}".format(counts['total'], counts['ok'], counts['error'])
-
-        if counts['error'] > int(counts['total'] * 0.1) and counts['total'] >= 10:
-          print "TOO MANY ERRORS (> 10%) -- Quitting!"
-          sys.exit(1)
-
-    fetch_data.fetch(fetch_config, query, handle_row)
-
-    # clean up any leftovers
-    if len(request_list) > 0:
-      send_to_rj(request_list)
-
-    print "DONE"
-    print "TOTAL: {}\tOK: {}\tERROR: {}".format(counts['total'], counts['ok'], counts['error'])
-
-def process_list(domains):
-    data = []
-    for domain in domains:
-        company = get_company(domain)
-        data.append(format_request(company)) if company else data.append(format_null_request(domain))
-    print(data)
-    send_to_rj(data)
+    print("DONE")
 
 def get_config():
     config = {}
@@ -115,7 +103,18 @@ def get_config():
         config.update(m)
     return config
 
+if len(sys.argv) != 2:
+    print("usage: {} [query-file]".format(sys.argv[0]))
+    sys.exit(1)
 
+query_file = sys.argv[1]
+if not os.path.exists(query_file):
+    print("Error: {} does not exist".format(query_file))
+    sys.exit(1)
+
+counts = {'total': 0, 'ok': 0, 'error': 0}
+query = open(query_file).read()
 config = get_config()
 clearbit.key = config['clearbit_access_token']
-fetch_and_process("select domain from accounts limit 10")
+
+fetch_and_process(query)
