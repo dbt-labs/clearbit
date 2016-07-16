@@ -45,8 +45,8 @@ def send_to_rj(data):
         'Authorization': "Bearer %s" % (config['rjm_access_key'])
         }
     r = requests.post(url, json = data, headers = headers)
-    if (suffix == 'push' and r.status_code == 201) or (suffix == 'validate' and r.status_code == 200, 201):
-      print("  -> Success")
+    if r.status_code in [200, 201]:
+      print("  -> Success {}".format(r.status_code))
     else:
       print("  -> ERROR! {}".format(r.content))
 
