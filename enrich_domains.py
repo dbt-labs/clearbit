@@ -55,10 +55,18 @@ def get_company(target_domain):
     if company != None and 'pending' not in company:
       return company
 
+def fix_encode(company, field_name):
+    "some responses contain utf-8 or None 'domain' or 'company' fields"
+
+    if field_name in company and company[field_name] is not None:
+        return company[field_name].encode('ascii', 'ignore')
+    else:
+        return "unknown"
+
 def get_response_for_found_domain(domain, company):
     response = format_request(company)
-    company_domain = company['domain'].encode('ascii', 'ignore')
-    company_name   = company['name'].encode('ascii', 'ignore')
+    company_domain = fix_encode(company, 'domain')
+    company_name   = fix_encode(company, 'name')
     print("{} Found:\t{}\t{}".format(counts['total'], company_domain, company_name))
     counts['ok'] += 1
     return response
