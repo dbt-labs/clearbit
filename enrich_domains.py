@@ -64,10 +64,12 @@ def fix_encode(company, field_name):
         return "unknown"
 
 def get_response_for_found_domain(domain, company):
+    # in case there's an alias which doesn't get picked up by clearbit
+    company['requested_domain'] = domain
     response = format_request(company)
     company_domain = fix_encode(company, 'domain')
     company_name   = fix_encode(company, 'name')
-    print("{} Found:\t{}\t{}".format(counts['total'], company_domain, company_name))
+    print("{} Found:\t{}\t{}\t{}".format(counts['total'], domain, company_domain, company_name))
     counts['ok'] += 1
     return response
 
