@@ -14,7 +14,9 @@ def format_request(company):
         "sequence": int(round(time.time() * 1000)),
         "action": "upsert",
         "key_names": [
-            "id"
+            "id",
+            "domain",
+            "requested_domain"
             ],
         "data": company
         }
