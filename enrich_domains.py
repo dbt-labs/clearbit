@@ -6,6 +6,16 @@ import sys
 import os, sys
 import datafetcher
 
+import logging
+logger = logging.getLogger('clearbit_enrich')
+logger.setLevel(logging.DEBUG)
+
+ch = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+ch.setFormatter(formatter)
+logger.addHandler(ch)
+
+
 def format_request(company):
     company['response_timestamp'] = time.time()
     return  {
@@ -41,16 +51,16 @@ def format_null_request(domain):
 def send_to_rj(data):
     suffix = 'push' if config['mode'] == 'production' else 'validate'
     url = "%s/%s" % (config['rjm_base_url'], suffix)
-    print("SENDING TO: {}".format(url))
+    logger.info("SENDING TO: {}".format(url))
     headers = {
         'Content-Type': 'application/json',
         'Authorization': "Bearer %s" % (config['rjm_access_key'])
         }
     r = requests.post(url, json = data, headers = headers)
     if r.status_code in [200, 201]:
-      print("  -> Success {}".format(r.status_code))
+      logger.info("  -> Success {}".format(r.status_code))
     else:
-      print("  -> ERROR! {}".format(r.content))
+      logger.info("  -> ERROR! {}".format(r.content))
 
 def get_company(target_domain):
     company = clearbit.Company.find(domain=target_domain, stream=True)
@@ -71,13 +81,13 @@ def get_response_for_found_domain(domain, company):
     response = format_request(company)
     company_domain = fix_encode(company, 'domain')
     company_name   = fix_encode(company, 'name')
-    print("{} Found:\t{}\t{}\t{}".format(counts['total'], domain, company_domain, company_name))
+    logger.info("{} Found:\t{}\t{}\t{}".format(counts['total'], domain, company_domain, company_name))
     counts['ok'] += 1
     return response
 
 def get_response_for_missing_domain(domain, error_reason):
     response = format_null_request(domain)
-    print("{} Not found:\t{}\t{}".format(counts['total'], domain, error_reason))
+    logger.info("{} Not found:\t{}\t{}".format(counts['total'], domain, error_reason))
     counts['error'] += 1
     return response
 
@@ -100,13 +110,14 @@ def fetch_and_process(query):
     fetch_config = config['fetch']
     batch_size = fetch_config['batch_size']
 
+    logger.info("Trying to fetch")
     for batch_of_records in datafetcher.fetch(fetch_config, query, batch_size):
         responses = [get_response_for_domain(record['domain']) for record in batch_of_records]
         send_to_rj(responses)
 
-        print("TOTAL: {}\tOK: {}\tERROR: {}".format(counts['total'], counts['ok'], counts['error']))
+        logger.info("TOTAL: {}\tOK: {}\tERROR: {}".format(counts['total'], counts['ok'], counts['error']))
 
-    print("DONE")
+    logger.info("DONE")
 
 def get_config():
     config = {}
@@ -116,14 +127,15 @@ def get_config():
     return config
 
 if len(sys.argv) != 2:
-    print("usage: {} [query-file]".format(sys.argv[0]))
+    logger.info("usage: {} [query-file]".format(sys.argv[0]))
     sys.exit(1)
 
 query_file = sys.argv[1]
 if not os.path.exists(query_file):
-    print("Error: {} does not exist".format(query_file))
+    logger.info("Error: {} does not exist".format(query_file))
     sys.exit(1)
 
+logger.info("Starting sync")
 counts = {'total': 0, 'ok': 0, 'error': 0}
 query = open(query_file).read()
 config = get_config()
